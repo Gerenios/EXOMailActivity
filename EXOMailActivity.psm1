@@ -1,6 +1,8 @@
 ﻿$EXOMailActivity_credentials
 $EXOMailActivity_user
 
+$token="EwAoA+l3BAAUv0lYxoez7x2t6RowHa2liVeLW/wAAawhWygBQh5LqeUI+UgVXXA5cXdxYqNuvCvnvFFW5nIhfVZ7Kt3xf8sPhR9uYlNWRrfceo46B+jKLF6iVREkvAVaKUQ35A0z6QAE4Oiogd/iB8cnPbs84veU86T7y8Do3M7ejfBWIp24jSy5pq5nR9vP3V1vusuDlss87sMDb7tHwWmqP0xz9WIRxzhpZcUnzYehbH1s78xKqbB50GJ/KQXunuQuhVtpnQ762fN5A7qffnqRfHC+VhN3WU8m/pJB5ebY19iOaGw4mEevq39GQMra1arqZNAoBdBrJ6++NGLBuFmFR1g8+8eSsRNWmQh2BIQnJXKSt/qGq+J8Q2VzaSMDZgAACBz5Nu1vnr1L+AHSJZWsudZ4l19fZs+W51lXqkn6Hisnm0n2FkU61WnKyTPBNIiZUPHivfPD6EHBNYYmTw61SCOPnErwenWAwMbG9xVwHaMk0ehUCJ9Sq2VQG4OCMKhn2xP9CjdhnPRI+zLb0m0k5EuiZ5eMgSDUC1NItpci/mZTDPalNctMHIC9bDQnER+33o2nZCI1K8Gpo/PQ7aKbo8QhTqDdtl7ZqxST1z71AyMaAxtiYuGMQXDvdIcCrEGiqhDpoLqgN6AVQW3U52vGE7kP8buyG0LEUThiK9/1t7eg+mzATzONIFKJqR2nP9b/CEKJM14b8Zd48YW632PbcUV4KZIiCRIBwjvuEqY/MxBcTRYjutjLgXR1VfUMqe9y1j3sdrBZpDcxW6jtXGWlaP+AmODD8rjwW+dLfaCGm/SfWQUc1oRomNNBQ0+DULs/YbWyRw6tcXh51DqqokbCS4pUZnnFC2OC6Y3Y5DGp/ehMqFsejBcKyg6kqVL/LVZO8hryGoWbSSmrCNw8HCTq2JdcqOO4rSkRdieVmjC3rZzkKmHbI9ACsEJNJb0i/+g10rJ9AeAstO3UMt++bhnzUFEW6infTLH4H5ajtvueaGfsYsRbwJNRuEnMqGlEwbYfcTBVvhh65ppxhvLMSmxAp1/3/7g7Jt0/xrFBxzTPzIPXdo00Ag=="
+
 
 function Get-MailActivity 
 {
@@ -155,8 +157,9 @@ Get-MailActivityDetails
 
         # All parameters are valid so we're good to go!
 
-        # Create a header required by the Activity API
+        # Create a headers required by the Activity API
         $headers = @{"Prefer" = 'exchange.behavior="ActivityAccess"'}
+        $headers += @{"Accept"="application/json; odata.metadata=none"}
 
         # Create a url - Select only standard properties and sort by TimeStamp
         $api_url="https://outlook.office365.com/api/v1.0/Users('$user')/Activities?`$orderby=TimeStamp+asc&`$select=TimeStamp,ActivityIdType,ActivityCreationTime,ActivityItemId,AppIdType,ClientSessionId,CustomProperties"
@@ -190,11 +193,26 @@ Get-MailActivityDetails
         # Verbose
         Write-Verbose "Querying API: $api_url"
 
-        # Invoke the API call
-        $response = Invoke-RestMethod $api_url -Headers $headers -Credential $Credentials 
+        $response=try{
+            # Invoke the API call
+            $responseBody=Invoke-RestMethod $api_url -Headers $headers -Credential $Credentials
+            $responseBody.value
+        }
+        Catch{
+            # Get the error details
+            $exception=$_
+            $http_error=$exception.Exception.Message
+            $result = $exception.Exception.Response.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($result)
+            $reader.BaseStream.Position = 0
+            $reader.DiscardBufferedData()
+            $responseBody=($reader.ReadToEnd()|ConvertFrom-Json).error
+            $responseBody | Add-Member -NotePropertyName "HTTP error" -NotePropertyValue $http_error
+            $responseBody
+        }
 
         # Return the results
-        return $response.Value
+        return $response
     }
 }
 
@@ -298,9 +316,24 @@ Get-MailActivity
         # Verbose
         Write-Verbose "Querying API: $api_url"
 
-        # Invoke the API call
-        $response = Invoke-RestMethod $api_url -Credential $Credentials
-
+        $response=try{
+            # Invoke the API call
+            $responseBody=Invoke-RestMethod $api_url -Credential $Credentials
+            $responseBody
+        }
+        Catch{
+            # Get the error details
+            $exception=$_
+            $http_error=$exception.Exception.Message
+            $result = $exception.Exception.Response.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($result)
+            $reader.BaseStream.Position = 0
+            $reader.DiscardBufferedData()
+            $responseBody=($reader.ReadToEnd()|ConvertFrom-Json).error
+            $responseBody | Add-Member -NotePropertyName "HTTP error" -NotePropertyValue $http_error
+            $responseBody
+        }
+        
         # Return the results
         return $response
     }
